@@ -8,7 +8,11 @@
 
     <org.digdug.widget.AnimatedTextView
         android:id="@+id/text"
-        android:text="@string/hello_world" android:layout_width="match_parent"
+        android:paddingLeft="20dp"
+        android:paddingRight="20dp"
+        android:gravity="right"
+        android:text="@string/hello_world"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content" />
 
     <Button android:id="@+id/toggle"

@@ -43,10 +43,10 @@ public class MainActivity extends ActionBarActivity {
 
     List<CharSequence> strings = new ArrayList<CharSequence>()  {{
             add("Hello world!");
+            add("Something something");
             add("Hello world with more");
             add("Hello wesley");
             add("Bye   wes");
-            add("Something something");
     }};
 
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
