@@ -12,4 +12,11 @@
         <item>Squash</item>
         <item>Zoom</item>
     </string-array>
+
+    <string-array name="gravities">
+        <item>Left</item>
+        <item>Center</item>
+        <item>Right</item>
+    </string-array>
+
 </resources>

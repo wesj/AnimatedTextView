@@ -2,12 +2,15 @@ package org.digdug.widget;
 
 import android.annotation.TargetApi;
 import android.content.Context;
+import android.content.res.Resources;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.os.Build;
+import android.support.annotation.AnimRes;
 import android.text.Spanned;
 import android.text.style.ForegroundColorSpan;
+import android.text.style.TextAppearanceSpan;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Gravity;
@@ -17,44 +20,21 @@ import android.view.animation.AnimationUtils;
 import android.view.animation.Transformation;
 import android.widget.TextView;
 
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
 
 public class AnimatedTextView extends TextView {
     private static final String LOGTAG = AnimatedTextView.class.getSimpleName();
     private Paint paint = new Paint();
-    private Animation animation = new AlphaAnimation(0f, 1.0f);
-    private Animation hideAnimation = new AlphaAnimation(1.0f, 0f);
-    private int duration = 500;
+    private int duration = 100;
     private int spacing = duration / 2;
-    private Transformation transformation = new Transformation();
-    private Transformation invertTransformation = new Transformation();
-    private boolean autoSlide = false;
+    private boolean autoSlide = true;
     private CharSequence toString;
 
-    public void setShowAnimation(final Animation animation) {
-        if (animation.getDuration() == 0) {
-            animation.setDuration(duration);
-        }
-        this.animation = animation;
-    }
-
-    public Animation getShowAnimation() {
-        return animation;
-    }
-
-    public void setHideAnimation(final Animation animation) {
-        if (animation.getDuration() == 0) {
-            Log.i(LOGTAG, "Update duration " + duration);
-            animation.setDuration(duration);
-        }
-        hideAnimation = animation;
-    }
-
-    public Animation getHideAnimation() {
-        return hideAnimation;
-    }
+    private Animation showAnimation = new AlphaAnimation(0f, 1.0f);
+    private Animation hideAnimation = new AlphaAnimation(1.0f, 0f);
+    private Transformation showTransformation = new Transformation();
+    private Transformation hideTransformation = new Transformation();
 
     public AnimatedTextView(Context context) {
         super(context);
@@ -77,6 +57,18 @@ public class AnimatedTextView extends TextView {
         init();
     }
 
+    @Override
+    public void setTextSize(float size) {
+        fromSize = getTextSize();
+        final float scale = getResources().getDisplayMetrics().density;
+        toSize = size * scale;
+
+        toggleText(getText());
+
+        fromSize = toSize = null;
+        super.setTextSize(size);
+    }
+
     private void init() {
         paint.setTextSize(getTextSize());
         paint.setColor(Color.BLACK);
@@ -88,7 +80,8 @@ public class AnimatedTextView extends TextView {
 
     public void setDuration(int duration) {
         this.duration = duration;
-        if (animation != null) animation.setDuration(duration);
+
+        if (showAnimation != null) showAnimation.setDuration(duration);
         if (hideAnimation != null) hideAnimation.setDuration(duration);
     }
 
@@ -98,6 +91,51 @@ public class AnimatedTextView extends TextView {
 
     public int getSpacing() {
         return spacing;
+    }
+
+    public void setAnimations(@AnimRes int in, @AnimRes int out) {
+        final Resources res = getResources();
+        final Animation inAnim = AnimationUtils.loadAnimation(getContext(), in);
+        final Animation outAnim = AnimationUtils.loadAnimation(getContext(), out);
+        setAnimations(inAnim, outAnim);
+    }
+
+    private void setAnimations(Animation inAnim, Animation outAnim) {
+        setShowAnimation(inAnim);
+        setHideAnimation(outAnim);
+    }
+
+    public void setShowAnimation(@AnimRes final int animId) {
+        Animation anim = AnimationUtils.loadAnimation(getContext(), animId);
+        setShowAnimation(anim);
+    }
+
+    public void setShowAnimation(final Animation animation) {
+        if (animation.getDuration() == 0) {
+            animation.setDuration(duration);
+        }
+        this.showAnimation = animation;
+    }
+
+    public Animation getShowAnimation() {
+        return showAnimation;
+    }
+
+    public void setHideAnimation(@AnimRes final int animId) {
+        Animation anim = AnimationUtils.loadAnimation(getContext(), animId);
+        setHideAnimation(anim);
+    }
+
+    public void setHideAnimation(final Animation animation) {
+        Log.i(LOGTAG, "Set hide " + animation + " - " + animation.getDuration());
+        if (animation.getDuration() == 0) {
+            animation.setDuration(duration);
+        }
+        hideAnimation = animation;
+    }
+
+    public Animation getHideAnimation() {
+        return hideAnimation;
     }
 
     private enum TransitionType {
@@ -111,41 +149,86 @@ public class AnimatedTextView extends TextView {
 
         Character from;
         Character to;
+
         TransitionType type;
         public Integer fromColor = null;
+        public Float fromSize = null;
         public Integer toColor = null;
+        public Float toSize = null;
     }
 
-    public void addTransitionFor(int position, int currentI, float show, float hide) {
+    private enum Destination {
+        FROM, TO;
+    }
+    private Integer fromColor = null;
+    private Integer toColor = null;
+    private int getColor(Destination dest) {
+        if (dest == Destination.FROM && fromColor != null) {
+            return fromColor;
+        } else if (dest == Destination.TO && toColor != null) {
+            return toColor;
+        }
+        return getCurrentTextColor();
+    }
+
+    private Float fromSize = null;
+    private Float toSize = null;
+    private float getTextSize(Destination dest) {
+        if (dest.equals(Destination.FROM) && fromSize != null) {
+            return fromSize;
+        } else if (dest.equals(Destination.TO) && toSize != null) {
+            return toSize;
+        }
+        return getTextSize();
+    }
+
+    public Transition addTransitionFor(int position, int currentI, float show, float hide) {
         Transition transition = null;
         CharSequence current = getText();
         char to = toString.charAt(position);
 
         if (currentI < 0 || currentI >= current.length()) {
-            transition = addTransition(to, to, show, hide);
-            // onDraw uses colors to determine if it should transition or not. Make sure we set one for now...
-            // XXX - onDraw should be smarter here
-            transition.fromColor = getForegroundColor(toString, position);
+            transition = addTransition(null, to, show, hide);
         } else {
             char from = current.charAt(currentI);
             transition = addTransition(from, to, show, hide);
-            transition.fromColor = getForegroundColor(current, currentI);
         }
+        // onDraw uses colors to determine if it should transition or not. Make sure we set one for now...
+        // XXX - onDraw should be smarter here
+        transition.fromColor = getForegroundColor(current, currentI, getColor(Destination.FROM));
+        transition.fromSize = getTextSize(current, currentI, getTextSize(Destination.FROM));
 
-        transition.toColor = getForegroundColor(toString, position);
+        transition.toColor = getForegroundColor(toString, position, getColor(Destination.TO));
+        transition.toSize = getTextSize(toString, position, getTextSize(Destination.TO));
+        return transition;
     }
 
-    private int getForegroundColor(CharSequence chars, int position) {
+    private int getForegroundColor(CharSequence chars, int position, int defaultColor) {
         if (chars instanceof Spanned) {
             Spanned spanned = (Spanned) chars;
             Object[] spans = spanned.getSpans(position, position+1, Object.class);
             for (Object span : spans) {
+                // Log.i(LOGTAG, "Span " + span);
                 if (span instanceof ForegroundColorSpan) {
+                    // Log.i(LOGTAG, "Get Foreground " + chars.subSequence(position, position+1) + ", " + ((ForegroundColorSpan) span).getForegroundColor())  ;
                     return ((ForegroundColorSpan) span).getForegroundColor();
                 }
             }
         }
-        return getCurrentTextColor();
+        return defaultColor;
+    }
+
+    private float getTextSize(CharSequence chars, int position, float defaultSize) {
+        if (chars instanceof Spanned) {
+            Spanned spanned = (Spanned) chars;
+            Object[] spans = spanned.getSpans(position, position+1, Object.class);
+            for (Object span : spans) {
+                if (span instanceof TextAppearanceSpan) {
+                    return ((TextAppearanceSpan) span).getTextSize();
+                }
+            }
+        }
+        return defaultSize;
     }
 
     public void toggleText(CharSequence text) {
@@ -155,64 +238,91 @@ public class AnimatedTextView extends TextView {
         CharSequence current = getText();
 
         if ((getGravity() & Gravity.LEFT) == Gravity.LEFT) {
-            float position = getPaddingLeft();
-            float endPosition = getPaddingLeft();
-
-            for (int i = 0; i < text.length(); i++) {
-                char c1 = text.charAt(i);
-                addTransitionFor(i, i, position, endPosition);
-
-                if (i < current.length()) {
-                    float size = paint.measureText(current, i, i + 1);
-                    position += size;
-                }
-
-                float size = paint.measureText(text, i, i + 1);
-                endPosition += size;
-            }
-
-            for (int i = text.length(); i < current.length(); i++) {
-                char c2 = current.charAt(i);
-                Transition t = addTransition(c2, c2, position, endPosition);
-                t.fromColor = t.toColor = getForegroundColor(current, i);
-                float size = paint.measureText(current, i, i + 1);
-                position += size;
-                endPosition += size;
-            }
+            toggleTextLeft(text, current);
         } else {
-            float position = getWidth() - getPaddingRight();
-            float endPosition = position;
-            int currentI = current.length() - 1;
-            for (int i = text.length() - 1; i >= 0; i--) {
-                float startSize = 0;
-                if (currentI >= 0) {
-                    startSize = paint.measureText(current, currentI, currentI + 1);
-                    position -= startSize;
-                    // Log.i(LOGTAG, "Measure " + current.charAt(currentI) + ", size = " + startSize);
-                }
-
-                float endSize = paint.measureText(text, i, i + 1);
-                endPosition -= endSize;
-
-                addTransitionFor(i, currentI, position, endPosition);
-                currentI--;
-            }
-
-            for (int i = currentI; i >= 0; i--) {
-                char c2 = current.charAt(i);
-                float size = paint.measureText(current, i, i + 1);
-                Transition t = addTransition(c2, null, position - size, endPosition - size);
-                t.fromColor = t.toColor = getForegroundColor(current, i);
-                position -= size;
-                endPosition -= size;
-            }
+            toggleTextRight(text, current);
         }
 
-        animation.startNow();
+        showAnimation.startNow();
         hideAnimation.startNow();
 
         setText(text);
         postInvalidateOnAnimation();
+    }
+
+    private void toggleTextRight(CharSequence text, CharSequence current) {
+        float position = getWidth() - getPaddingRight();
+        float endPosition = position;
+        int currentI = current.length() - 1;
+
+        for (int i = text.length() - 1; i >= 0; i--) {
+            float startSize = 0;
+            if (currentI >= 0) {
+                startSize = paint.measureText(current, currentI, currentI + 1);
+                position -= startSize;
+            }
+
+            float endSize = paint.measureText(text, i, i + 1);
+            endPosition -= endSize;
+
+            addTransitionFor(i, currentI, position, endPosition);
+            currentI--;
+        }
+
+        for (int i = currentI; i >= 0; i--) {
+            char c2 = current.charAt(i);
+            paint.setTextSize(getTextSize(current, i, getTextSize(Destination.FROM)));
+            float fromSize = paint.measureText(current, i, i + 1);
+
+            paint.setTextSize(getTextSize(current, i, getTextSize(Destination.TO)));
+            float toSize = paint.measureText(current, i, i + 1);
+
+            Transition t = addTransition(c2, null, position - fromSize, endPosition - toSize);
+            t.fromColor = getForegroundColor(current, i, getColor(Destination.FROM));
+            t.toColor = getForegroundColor(current, i, getColor(Destination.TO));
+            t.fromSize = getTextSize(current, i, getTextSize(Destination.FROM));
+            t.toSize = getTextSize(current, i, getTextSize(Destination.TO));
+
+            position -= fromSize;
+            endPosition -= toSize;
+        }
+    }
+
+    private void toggleTextLeft(CharSequence text, CharSequence current) {
+        float position = getPaddingLeft();
+        float endPosition = getPaddingLeft();
+
+        for (int i = 0; i < text.length(); i++) {
+            char c1 = text.charAt(i);
+            Transition t = addTransitionFor(i, i, position, endPosition);
+
+            if (i < current.length()) {
+                paint.setTextSize(t.fromSize);
+                float size = paint.measureText(current, i, i + 1);
+                position += size;
+            }
+
+            paint.setTextSize(t.toSize);
+            float size = paint.measureText(text, i, i + 1);
+            endPosition += size;
+        }
+
+        for (int i = text.length(); i < current.length(); i++) {
+            char c2 = current.charAt(i);
+            Transition t = addTransition(c2, null, position, endPosition);
+            t.fromColor = getForegroundColor(current, i, getColor(Destination.FROM));
+            t.toColor = getForegroundColor(current, i, getColor(Destination.TO));
+            t.fromSize = getTextSize(current, i, getTextSize(Destination.FROM));
+            t.toSize = getTextSize(current, i, getTextSize(Destination.TO));
+
+            paint.setTextSize(t.fromSize);
+            float size = paint.measureText(current, i, i + 1);
+            position += size;
+
+            paint.setTextSize(t.toSize);
+            size = paint.measureText(current, i, i + 1);
+            endPosition += size;
+        }
     }
 
     @Override
@@ -245,7 +355,7 @@ public class AnimatedTextView extends TextView {
         canvas.translate(0, getPaddingTop());
         if (transitions.size() > 0) {
             long now = AnimationUtils.currentAnimationTimeMillis();
-            long showingTime = animation.getStartTime() + animation.getDuration();
+            long showingTime = showAnimation.getStartTime() + showAnimation.getDuration();
             long endingTime = hideAnimation.getStartTime() + hideAnimation.getDuration();
             int i = 0;
 
@@ -260,12 +370,12 @@ public class AnimatedTextView extends TextView {
 
             // If nothing moved, end the transitions
             if (numMoved == 0) {
-                animation.getTransformation(now, transformation);
-                hideAnimation.getTransformation(now, invertTransformation);
+                showAnimation.getTransformation(now, showTransformation);
+                hideAnimation.getTransformation(now, hideTransformation);
             }
 
-            // Invalidate if the animation is still going
-            if (!animation.hasEnded() || !hideAnimation.hasEnded()) {
+            // Invalidate if the showAnimation is still going
+            if (!showAnimation.hasEnded() || !hideAnimation.hasEnded()) {
                 postInvalidateOnAnimation();
             } else {
                 transitions.clear();
@@ -291,16 +401,18 @@ public class AnimatedTextView extends TextView {
     }
 
     private boolean drawTransition(Canvas canvas, Transition transition, long now, long showTime, long hideTime) {
-        int prevColor = paint.getColor();
         boolean moved = false;
         float size = paint.measureText("" + transition.to, 0, 1);
-        animation.initialize((int) size, (int) paint.getTextSize(), getWidth(), getHeight());
+        showAnimation.initialize((int) size, (int) paint.getTextSize(), getWidth(), getHeight());
         hideAnimation.initialize((int) size, (int) paint.getTextSize(), getWidth(), getHeight());
 
-        if (transition.from == transition.to && transition.fromColor.equals(transition.toColor)) {
+        if (transition.from == transition.to &&
+            transition.fromColor.equals(transition.toColor) &&
+            transition.fromSize.equals(transition.toSize)) {
+            // Log.i(LOGTAG, "Boring " + transition.from + " to " + transition.to);
             // If nothing is changing, just draw the letter in place
-            transformation.clear();
-            invertTransformation.clear();
+            showTransformation.clear();
+            hideTransformation.clear();
 
             int save = canvas.save();
             canvas.translate(transition.endPosition, paint.getTextSize());
@@ -309,86 +421,97 @@ public class AnimatedTextView extends TextView {
         } else {
             float dt = 1;
             float dt2 = 0;
-            if (now < animation.getStartTime()) {
-                // If this letter's animation hasn't started yet, draw it at its startTime
+            if (now < showAnimation.getStartTime()) {
+                // Log.i(LOGTAG, "Waiting " + transition.from + " to " + transition.to);
+                // If this letter's showAnimation hasn't started yet, draw it at its startTime
                 if (autoSlide) {
                     dt = 0;
                     dt2 = 0;
                 }
-                animation.getTransformation(animation.getStartTime(), transformation);
-                hideAnimation.getTransformation(hideAnimation.getStartTime(), invertTransformation);
+                showAnimation.getTransformation(showAnimation.getStartTime(), showTransformation);
+                hideAnimation.getTransformation(hideAnimation.getStartTime(), hideTransformation);
             } else if (now < showTime) {
-                // This letter is moving, get its transformation set up correctly
+                // Log.i(LOGTAG, "Moving " + transition.from + " to " + transition.to);
+                // This letter is moving, get its showTransformation set up correctly
                 moved = true;
-                animation.getTransformation(now, transformation);
-                hideAnimation.getTransformation(now, invertTransformation);
+                showAnimation.getTransformation(now, showTransformation);
+                hideAnimation.getTransformation(now, hideTransformation);
                 if (autoSlide) {
-                    dt = animation.getInterpolator().getInterpolation((float) (now - animation.getStartTime()) / (float) animation.getDuration());
+                    dt = showAnimation.getInterpolator().getInterpolation((float) (now - showAnimation.getStartTime()) / (float) showAnimation.getDuration());
                     dt2 = hideAnimation.getInterpolator().getInterpolation((float) (now - hideAnimation.getStartTime()) / (float) hideAnimation.getDuration());
                 }
             } else {
-                // This letter is done. Keep it at the end of its animation (so the animation doesn't end).
-                animation.getTransformation(showTime - 1, transformation);
-                hideAnimation.getTransformation(hideTime - 1, invertTransformation);
+                // Log.i(LOGTAG, "Done " + transition.from + " to " + transition.to);
+                // This letter is done. Keep it at the end of its showAnimation (so the showAnimation doesn't end).
+                showAnimation.getTransformation(showTime - 1, showTransformation);
+                hideAnimation.getTransformation(hideTime - 1, hideTransformation);
+                dt = 1;
+                dt2 = 1;
             }
 
-            if (transition.from != null) {
-                if (transition.fromColor != null) {
-                    paint.setColor(transition.fromColor);
+            if (transition.from == transition.to) {
+                drawMoving(canvas, transition, dt2);
+            } else {
+                if (transition.from != null) {
+                    drawShowing(canvas, transition, transition.from, transition.fromColor, hideTransformation, dt2);
                 }
-                drawHiding(canvas, transition, dt2);
-                paint.setColor(prevColor);
-            }
 
-            if (transition.to != null) {
-                if (transition.toColor != null) {
-                    paint.setColor(transition.toColor);
+                if (transition.to != null) {
+                    drawShowing(canvas, transition, transition.to, transition.toColor, showTransformation, dt);
                 }
-                drawShowing(canvas, transition, dt);
-                paint.setColor(prevColor);
             }
         }
+        // Log.i(LOGTAG, "Moved " + moved);
         return moved;
     }
 
-    private void drawShowing(Canvas canvas, Transition transition, float dt) {
-        float alpha = 1.0f;
-        if (transformation.getTransformationType() == Transformation.TYPE_ALPHA || transformation.getTransformationType() == Transformation.TYPE_BOTH) {
-            alpha = transformation.getAlpha();
-        }
-        paint.setAlpha((int) (alpha * 255));
+    private void drawMoving(Canvas canvas, Transition transition, float dt) {
+        int prevColor = paint.getColor();
+        float prevSize = paint.getTextSize();
+
+        paint.setTextSize(transition.fromSize + dt * (transition.toSize - transition.fromSize));
+        // This probably won't look great.
+        paint.setColor(transition.fromColor + (int) (dt * (transition.toColor - transition.fromColor)));
 
         int save = canvas.save();
         canvas.translate(transition.startPosition + dt * (transition.endPosition - transition.startPosition), paint.getTextSize());
-        if (transformation.getTransformationType() == Transformation.TYPE_MATRIX || transformation.getTransformationType() == Transformation.TYPE_BOTH) {
-            canvas.concat(transformation.getMatrix());
-        }
-
         canvas.drawText("" + transition.to, 0, 1,
                 0, 0,
                 paint);
         canvas.restoreToCount(save);
+
+        paint.setColor(prevColor);
+        paint.setTextSize(prevSize);
     }
 
-    float[] values = new float[9];
-    private void drawHiding(Canvas canvas, Transition transition, float dt) {
+    private void drawShowing(Canvas canvas, Transition transition, char c, int color, Transformation transform, float dt) {
         float alpha = 1.0f;
-        if (invertTransformation.getTransformationType() == Transformation.TYPE_ALPHA ||
-                invertTransformation.getTransformationType() == Transformation.TYPE_BOTH) {
-            alpha = invertTransformation.getAlpha();
-        }
-        paint.setAlpha((int)(alpha * 255));
+        int prevColor = paint.getColor();
+        float prevSize = paint.getTextSize();
 
         int save = canvas.save();
-        canvas.translate(transition.startPosition + dt * (transition.endPosition - transition.startPosition), paint.getTextSize());
-        // Log.i(LOGTAG, "Drawing " + transition.from + ", " + (transition.startPosition + dt * (transition.endPosition - transition.startPosition)));
-        if (invertTransformation.getTransformationType() == Transformation.TYPE_MATRIX ||
-                invertTransformation.getTransformationType() == Transformation.TYPE_BOTH) {
-            canvas.concat(invertTransformation.getMatrix());
+        if (transform.getTransformationType() == Transformation.TYPE_ALPHA || transform.getTransformationType() == Transformation.TYPE_BOTH) {
+            alpha = transform.getAlpha();
+            // Log.i(LOGTAG, "Draw " + alpha + " -- " + c);
         }
-        canvas.drawText("" + transition.from, 0, 1,
+
+        paint.setTextSize(transition.fromSize + dt * (transition.toSize - transition.fromSize));
+        paint.setColor(color);
+        paint.setAlpha((int) (alpha * 255));
+
+        canvas.translate(transition.startPosition + dt * (transition.endPosition - transition.startPosition), paint.getTextSize());
+        if (transform.getTransformationType() == Transformation.TYPE_MATRIX || transform.getTransformationType() == Transformation.TYPE_BOTH) {
+            canvas.concat(transform.getMatrix());
+        }
+
+        canvas.drawText("" + c, 0, 1,
                 0, 0,
                 paint);
         canvas.restoreToCount(save);
+
+        paint.setColor(prevColor);
+        paint.setTextSize(prevSize);
     }
+
+    float[] values = new float[9];
 }

@@ -31,6 +31,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:id="@+id/duration"
+            android:max="500"
             android:progress="25"/>
     </LinearLayout>
 
@@ -45,12 +46,37 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:id="@+id/spacing"
+            android:max="500"
             android:progress="25"/>
     </LinearLayout>
 
-    <Spinner
-        android:id="@+id/transitions"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"></Spinner>
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <Spinner
+            android:id="@+id/transitions"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"></Spinner>
+
+        <Spinner
+            android:id="@+id/gravitySelector"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"></Spinner>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Text Size"/>
+        <SeekBar
+            android:id="@+id/textSizeSeekbar"
+            android:max="20"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"></SeekBar>
+    </LinearLayout>
 
 </LinearLayout>

@@ -9,6 +9,7 @@ import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.style.ForegroundColorSpan;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -56,7 +57,8 @@ public class MainActivity extends ActionBarActivity {
 
         SpannableStringBuilder builder = new SpannableStringBuilder();
         builder.append("Hello ");
-        builder.append("world!", new ForegroundColorSpan(Color.BLUE), Spanned.SPAN_INCLUSIVE_INCLUSIVE);
+        builder.append("world!");
+        builder.setSpan(new ForegroundColorSpan(Color.BLUE), 6, 12, Spanned.SPAN_INCLUSIVE_INCLUSIVE);
         strings.add(builder);
 
         setContentView(R.layout.activity_main);
@@ -73,31 +75,43 @@ public class MainActivity extends ActionBarActivity {
         });
 
         SeekBar spacing = (SeekBar) findViewById(R.id.spacing);
+        spacing.setProgress(text.getSpacing());
         spacing.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-            }
-
-            @Override
-            public void onStartTrackingTouch(SeekBar seekBar) {
-            }
-
-            @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {
-                text.setSpacing((int) ((seekBar.getProgress() * 100 / 100)));
-            }
-        });
-
-        final SeekBar duration = (SeekBar) findViewById(R.id.duration);
-        duration.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {}
-
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) { }
             @Override
             public void onStartTrackingTouch(SeekBar seekBar) { }
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
-                text.setDuration(2000 * seekBar.getProgress() / 100);
+                float scale = getResources().getDisplayMetrics().density;
+                text.setSpacing(seekBar.getProgress());
+            }
+        });
+
+        final SeekBar duration = (SeekBar) findViewById(R.id.duration);
+        duration.setProgress(text.getDuration());
+        duration.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {}
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) { }
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                text.setDuration(seekBar.getProgress());
+            }
+        });
+
+        SeekBar textSizeSeekbar = (SeekBar) findViewById(R.id.textSizeSeekbar);
+        final float scale = getResources().getDisplayMetrics().density;
+        textSizeSeekbar.setProgress((int) ((text.getTextSize() - 10) / scale - 0.5));
+        textSizeSeekbar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) { }
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) { }
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                text.setTextSize((int) (10 + seekBar.getProgress()));
             }
         });
 
@@ -106,56 +120,46 @@ public class MainActivity extends ActionBarActivity {
                 R.array.transitions, android.R.layout.simple_spinner_item);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         transitions.setAdapter(adapter);
+        transitions.setSelection(0, true);
+        text.setAnimations(R.anim.fade_in, R.anim.fade_out);
         transitions.setOnItemSelectedListener(new OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 CharSequence obj = (CharSequence) parent.getItemAtPosition(position);
                 if (obj.equals("Fade")) {
-                    AlphaAnimation alpha = new AlphaAnimation(0f, 1f);
-                    text.setShowAnimation(alpha);
-
-                    alpha = new AlphaAnimation(1f, 0f);
-                    text.setHideAnimation(new AlphaAnimation(1f, 0f));
+                    text.setAnimations(R.anim.fade_in, R.anim.fade_out);
                 } else if (obj.equals("Rotate")) {
-                    AnimationSet set = new AnimationSet(true);
-                    set.addAnimation(new RotateAnimation(-90, 0, RotateAnimation.RELATIVE_TO_SELF, 0.5f, RotateAnimation.RELATIVE_TO_SELF, -0.5f));
-                    set.addAnimation(new AlphaAnimation(0, 1));
-                    text.setShowAnimation(set);
-
-                    set = new AnimationSet(true);
-                    set.addAnimation(new RotateAnimation(0, -90, RotateAnimation.RELATIVE_TO_SELF, 0.5f, RotateAnimation.RELATIVE_TO_SELF, -0.5f));
-                    set.addAnimation(new AlphaAnimation(1, 0));
-                    text.setHideAnimation(set);
+                    text.setAnimations(R.anim.rotate_in, R.anim.rotate_out);
                 } else if (obj.equals("Drop in")) {
-                    TranslateAnimation anim = new TranslateAnimation(0f, 0f, -50f, 0f);
-                    text.setShowAnimation(anim);
-
-                    anim = new TranslateAnimation(0f, 0f, 0f, 50f);
-                    text.setHideAnimation(anim);
+                    text.setAnimations(R.anim.drop_in, R.anim.drop_out);
                 } else if (obj.equals("Rise up")) {
-                    TranslateAnimation anim = new TranslateAnimation(0f, 0f, 50f, 0f);
-                    anim.setInterpolator(new OvershootInterpolator());
-                    text.setShowAnimation(anim);
-
-                    anim = new TranslateAnimation(0f, 0f, 0f, -50f);
-                    anim.setInterpolator(new OvershootInterpolator());
-                    text.setHideAnimation(anim);
+                    text.setAnimations(R.anim.rise_in, R.anim.rise_out);
                 } else if (obj.equals("Squash")) {
-                    Animation scale = new ScaleAnimation(0f, 1f, 1f, 1f, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, -0.5f);
-                    text.setShowAnimation(scale);
-
-                    scale = new ScaleAnimation(1f, 0f, 1f, 1f, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, -0.5f);
-                    text.setHideAnimation(scale);
+                    text.setAnimations(R.anim.squash_in, R.anim.squash_out);
                 } else if (obj.equals("Zoom")) {
-                    AnimationSet set = new AnimationSet(true);
-                    set.addAnimation(new ScaleAnimation(5f, 1f, 5f, 1f, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, -0.5f));
-                    set.addAnimation(new AlphaAnimation(0, 1));
-                    text.setShowAnimation(set);
+                    text.setAnimations(R.anim.zoom_in, R.anim.zoom_out);
+                }
+            }
 
-                    set = new AnimationSet(true);
-                    set.addAnimation(new ScaleAnimation(1f, 0f, 1f, 0f, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, -0.5f));
-                    set.addAnimation(new AlphaAnimation(1, 0));
-                    text.setHideAnimation(set);
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+
+        Spinner gravities = (Spinner) findViewById(R.id.gravitySelector);
+        adapter = ArrayAdapter.createFromResource(this,
+                R.array.gravities, android.R.layout.simple_spinner_item);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        gravities.setSelection(2, true);
+        gravities.setAdapter(adapter);
+        gravities.setOnItemSelectedListener(new OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                CharSequence obj = (CharSequence) parent.getItemAtPosition(position);
+                if (obj.equals("Left")) {
+                    text.setGravity(Gravity.LEFT);
+                } else if (obj.equals("Right")) {
+                    text.setGravity(Gravity.RIGHT);
                 }
             }
 
