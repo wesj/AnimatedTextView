@@ -19,4 +19,11 @@
         <item>Right</item>
     </string-array>
 
+    <string-array name="directions">
+        <item>Gravity</item>
+        <item>Left</item>
+        <item>Right</item>
+        <item>Random</item>
+    </string-array>
+
 </resources>

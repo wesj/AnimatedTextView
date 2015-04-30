@@ -19,8 +19,6 @@ import android.widget.Button;
 import android.widget.SeekBar;
 import android.widget.Spinner;
 
-import org.digdug.widget.AnimatedTextView;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -134,6 +132,32 @@ public class MainActivity extends ActionBarActivity {
             }
         });
 
+        Spinner directions = (Spinner) findViewById(R.id.directionSelector);
+        adapter = ArrayAdapter.createFromResource(this,
+                R.array.directions, android.R.layout.simple_spinner_item);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        directions.setAdapter(adapter);
+        directions.setSelection(0, true);
+        directions.setOnItemSelectedListener(new OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                CharSequence obj = (CharSequence) parent.getItemAtPosition(position);
+                if (obj.equals("Gravity")) {
+                    text.setDirection(AnimatedTextView.TransitionDirection.GRAVITY);
+                } else if (obj.equals("Left")) {
+                    text.setDirection(AnimatedTextView.TransitionDirection.LEFT);
+                } else if (obj.equals("Right")) {
+                    text.setDirection(AnimatedTextView.TransitionDirection.RIGHT);
+                } else if (obj.equals("Random")) {
+                    text.setDirection(AnimatedTextView.TransitionDirection.RANDOM);
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+
         Spinner gravities = (Spinner) findViewById(R.id.gravitySelector);
         adapter = ArrayAdapter.createFromResource(this,
                 R.array.gravities, android.R.layout.simple_spinner_item);
@@ -148,6 +172,8 @@ public class MainActivity extends ActionBarActivity {
                     text.setGravity(Gravity.LEFT);
                 } else if (obj.equals("Right")) {
                     text.setGravity(Gravity.RIGHT);
+                } else if (obj.equals("Center")) {
+                    text.setGravity(Gravity.CENTER_HORIZONTAL);
                 }
             }
 

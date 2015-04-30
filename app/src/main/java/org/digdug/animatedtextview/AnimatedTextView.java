@@ -1,4 +1,4 @@
-package org.digdug.widget;
+package org.digdug.animatedtextview;
 
 import android.annotation.TargetApi;
 import android.content.Context;
@@ -22,8 +22,6 @@ import android.view.animation.AnimationUtils;
 import android.view.animation.Transformation;
 import android.widget.TextView;
 
-import org.digdug.animatedtextview.R;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -40,6 +38,14 @@ public class AnimatedTextView extends TextView {
     private Transformation hideTransformation = new Transformation();
     @Nullable private Integer toGravity = null;
     private TransitionDirection direction = TransitionDirection.GRAVITY;
+
+    public void setDirection(TransitionDirection direction) {
+        this.direction = direction;
+    }
+
+    public TransitionDirection getDirection() {
+        return direction;
+    }
 
     public enum TransitionDirection {
         LEFT(1),
@@ -270,13 +276,12 @@ public class AnimatedTextView extends TextView {
         return transition;
     }
 
-    private float adjustMeasuredText(Float fromSize, Character c, TransitionDirection direction) {
+    private float adjustMeasuredText(Float fromSize, Character c) {
         if (c == null) {
             return 0;
         }
         paint.setTextSize(fromSize);
-        float size = paint.measureText("" + c, 0, 1);
-        return direction.value * size;
+        return paint.measureText("" + c, 0, 1);
     }
 
     private int getForegroundColor(CharSequence chars, int position, int defaultColor) {
@@ -317,7 +322,7 @@ public class AnimatedTextView extends TextView {
         toggleText(text, current);
 
         for (Transition transition : transitions) {
-            Log.i(LOGTAG, "" + transition);
+            // Log.i(LOGTAG, "" + transition);
         }
 
         if (showAnimation != null)
@@ -344,11 +349,27 @@ public class AnimatedTextView extends TextView {
     }
 
     private boolean isRightGravity(int gravity) {
-        return (gravity & Gravity.RIGHT) == Gravity.RIGHT;
+        final int hgrav = gravity & Gravity.HORIZONTAL_GRAVITY_MASK;
+        return hgrav == Gravity.RIGHT;
     }
 
     private boolean isLeftGravity(int gravity) {
-        return (gravity & Gravity.LEFT) == Gravity.LEFT;
+        final int hgrav = gravity & Gravity.HORIZONTAL_GRAVITY_MASK;
+        return hgrav == Gravity.LEFT;
+    }
+
+    private boolean isCenterGravity(int gravity) {
+        final int hgrav = gravity & Gravity.HORIZONTAL_GRAVITY_MASK;
+        return hgrav == Gravity.CENTER_HORIZONTAL;
+    }
+
+    private float getWidth(CharSequence text, float defaultSize) {
+        float width = 0;
+        for (int i = 0; i < text.length(); i++) {
+            float size = getTextSize(text, i, defaultSize);
+            width += adjustMeasuredText(size, text.charAt(i));
+        }
+        return width;
     }
 
     private void toggleText(CharSequence to, CharSequence from) {
@@ -359,28 +380,42 @@ public class AnimatedTextView extends TextView {
         float toPosition = isRightGravity(toGrav) ? getWidth() - getPaddingRight() : getPaddingLeft();
         float fromPosition = isRightGravity(fromGrav) ? getWidth() - getPaddingRight() : getPaddingLeft();
 
+        float defaultFromSize = getTextSize(Destination.FROM);
+        float defaultToSize = getTextSize(Destination.TO);
+
+        if (isCenterGravity(fromGrav)) {
+            fromPosition = (getWidth() - getWidth(from, defaultFromSize))/2;
+        }
+
+        if (isCenterGravity(toGrav)) {
+            toPosition = (getWidth() - getWidth(to, defaultToSize))/2;
+        }
+
         // If the gravity is changing, we still want to always grab from the left or right of the string.
         // That means, we need to shift our from position
-        if (direction == TransitionDirection.GRAVITY && toGrav != fromGrav) {
-            float defaultTextSize = getTextSize(Destination.FROM);
-            for (int i = 0; i < from.length(); i++) {
-                float size = getTextSize(from, i, defaultTextSize);
-                fromPosition += adjustMeasuredText(size, from.charAt(i), direction);
+        if (toGrav != fromGrav) {
+            if (isRightGravity(fromGrav) && direction == TransitionDirection.LEFT) {
+                fromPosition -= getWidth(from, defaultFromSize);
+            } else if (isLeftGravity(fromGrav) || isRightGravity(toGrav)) {
+                fromPosition += getWidth(from, defaultFromSize);
+                if (isCenterGravity(toGrav)) {
+                    toPosition += getWidth(to, defaultToSize);
+                }
             }
         }
 
         // We always use toGravity here so that we'll start from the same side, regardless of which direction
         // the text is running.
-        int fromIndex  = isRightGravity(toGravity) ? from.length() - 1 : 0;
-        int startIndex = isRightGravity(toGravity) ?   to.length() - 1 : 0;
-        int endIndex   = isRightGravity(toGravity) ?                -1 : to.length();
+        int fromIndex  = direction == TransitionDirection.RIGHT ? from.length() - 1 : 0;
+        int startIndex = direction == TransitionDirection.RIGHT ?   to.length() - 1 : 0;
+        int endIndex   = direction == TransitionDirection.RIGHT ?                -1 : to.length();
 
         for (int toIndex = startIndex; toIndex != endIndex; toIndex += direction.value) {
             Transition transition = addTransitionFor(from, to, fromIndex, toIndex, fromPosition, toPosition);
 
             // Adjust out position based on the textsize of the from and to strings.
-            fromPosition += adjustMeasuredText(transition.fromSize, transition.from, direction);
-            toPosition   += adjustMeasuredText(transition.toSize, transition.to, direction);
+            fromPosition += direction.value * adjustMeasuredText(transition.fromSize, transition.from);
+            toPosition   += direction.value * adjustMeasuredText(transition.toSize, transition.to);
 
             // If this is floating to the right, update its position to account for its size.
             if (direction == TransitionDirection.RIGHT) { transition.fromPosition = fromPosition; }
@@ -392,7 +427,7 @@ public class AnimatedTextView extends TextView {
 
         while (fromIndex > -1 && fromIndex < from.length()) {
             Transition transition = addTransitionFor(from, to, fromIndex, -1, fromPosition, toPosition);
-            fromPosition += adjustMeasuredText(transition.fromSize, transition.from, direction);
+            fromPosition += direction.value * adjustMeasuredText(transition.fromSize, transition.from);
             if (direction == TransitionDirection.RIGHT) { transition.fromPosition = fromPosition; }
             fromIndex += direction.value;
         }
@@ -404,11 +439,13 @@ public class AnimatedTextView extends TextView {
                 return TransitionDirection.RIGHT;
             } else if (isLeftGravity(toGrav)) {
                 return TransitionDirection.LEFT;
+
             } else if (isRightGravity(fromGrav)) {
                 return TransitionDirection.LEFT;
             } else if (isLeftGravity(fromGrav)) {
-                return TransitionDirection.LEFT;
+                return TransitionDirection.RIGHT;
             }
+
             return TransitionDirection.LEFT;
         }
         return this.direction;
