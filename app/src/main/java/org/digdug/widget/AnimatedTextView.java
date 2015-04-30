@@ -3,11 +3,13 @@ package org.digdug.widget;
 import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.res.Resources;
+import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.os.Build;
 import android.support.annotation.AnimRes;
+import android.support.annotation.Nullable;
 import android.text.Spanned;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.TextAppearanceSpan;
@@ -20,6 +22,8 @@ import android.view.animation.AnimationUtils;
 import android.view.animation.Transformation;
 import android.widget.TextView;
 
+import org.digdug.animatedtextview.R;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,31 +34,66 @@ public class AnimatedTextView extends TextView {
     private int spacing = duration / 2;
     private boolean autoSlide = true;
 
-    private Animation showAnimation = new AlphaAnimation(0f, 1.0f);
-    private Animation hideAnimation = new AlphaAnimation(1.0f, 0f);
+    @Nullable private Animation showAnimation = new AlphaAnimation(0f, 1.0f);
+    @Nullable private Animation hideAnimation = new AlphaAnimation(1.0f, 0f);
     private Transformation showTransformation = new Transformation();
     private Transformation hideTransformation = new Transformation();
-    private Integer toGravity;
+    @Nullable private Integer toGravity = null;
+    private TransitionDirection direction = TransitionDirection.GRAVITY;
 
     public enum TransitionDirection {
-        LEFT,
-        RIGHT,
-        GRAVITY,
-        RANDOM
+        LEFT(1),
+        RIGHT(-1),
+        GRAVITY(1),
+        RANDOM(1);
+
+        public final int value;
+
+        TransitionDirection(int val) {
+            this.value = val;
+        }
     }
 
     public AnimatedTextView(Context context) {
-        super(context);
+        super(context, null, R.style.AppTheme);
         init();
     }
 
     public AnimatedTextView(Context context, AttributeSet attrs) {
-        super(context, attrs);
+        this(context, attrs, R.style.AppTheme);
         init();
     }
 
     public AnimatedTextView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
+
+        final Resources.Theme theme = context.getTheme();
+        TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.AnimatedTextView, defStyleAttr, 0);
+
+        int n = a.length();
+        for (int i = 0; i < n; i++) {
+            int attr = a.getIndex(i);
+            switch (attr) {
+                case R.styleable.AnimatedTextView_duration:
+                    setDuration(a.getInteger(attr, duration));
+                    break;
+                case R.styleable.AnimatedTextView_spacing:
+                    setSpacing(a.getInteger(attr, spacing));
+                    break;
+                case R.styleable.AnimatedTextView_showAnimation: {
+                    int res = a.getResourceId(attr, 0);
+                    setShowAnimation(res);
+                    break;
+                }
+                case R.styleable.AnimatedTextView_hideAnimation: {
+                    int res = a.getResourceId(attr, 0);
+                    setHideAnimation(res);
+                    break;
+                }
+            }
+        }
+        a.recycle();
+
         init();
     }
 
@@ -113,12 +152,17 @@ public class AnimatedTextView extends TextView {
     }
 
     public void setShowAnimation(@AnimRes final int animId) {
+        if (animId == 0) {
+            setShowAnimation(null);
+            return;
+        }
+
         Animation anim = AnimationUtils.loadAnimation(getContext(), animId);
         setShowAnimation(anim);
     }
 
     public void setShowAnimation(final Animation animation) {
-        if (animation.getDuration() == 0) {
+        if (animation != null && animation.getDuration() == 0) {
             animation.setDuration(duration);
         }
         this.showAnimation = animation;
@@ -129,12 +173,17 @@ public class AnimatedTextView extends TextView {
     }
 
     public void setHideAnimation(@AnimRes final int animId) {
+        if (animId == 0) {
+            setHideAnimation(null);
+            return;
+        }
+
         Animation anim = AnimationUtils.loadAnimation(getContext(), animId);
         setHideAnimation(anim);
     }
 
     public void setHideAnimation(final Animation animation) {
-        if (animation.getDuration() == 0) {
+        if (animation != null && animation.getDuration() == 0) {
             animation.setDuration(duration);
         }
         hideAnimation = animation;
@@ -194,8 +243,7 @@ public class AnimatedTextView extends TextView {
 
     public Transition addTransitionFor(CharSequence fromChars, CharSequence toChars,
                                        int fromIndex, int toIndex,
-                                       float fromPosition, float toPosition,
-                                       int fromGravity, int toGravity) {
+                                       float fromPosition, float toPosition) {
         Character to = null;
         if (toIndex >= 0 && toIndex < toChars.length()) {
             to = toChars.charAt(toIndex);
@@ -222,13 +270,13 @@ public class AnimatedTextView extends TextView {
         return transition;
     }
 
-    private float adjustMeasuredText(Float fromSize, Character c, int gravity) {
+    private float adjustMeasuredText(Float fromSize, Character c, TransitionDirection direction) {
         if (c == null) {
             return 0;
         }
         paint.setTextSize(fromSize);
         float size = paint.measureText("" + c, 0, 1);
-        return gravity * size;
+        return direction.value * size;
     }
 
     private int getForegroundColor(CharSequence chars, int position, int defaultColor) {
@@ -272,7 +320,8 @@ public class AnimatedTextView extends TextView {
             Log.i(LOGTAG, "" + transition);
         }
 
-        showAnimation.startNow();
+        if (showAnimation != null)
+            showAnimation.startNow();
         hideAnimation.startNow();
 
         setText(text);
@@ -298,52 +347,71 @@ public class AnimatedTextView extends TextView {
         return (gravity & Gravity.RIGHT) == Gravity.RIGHT;
     }
 
-    private void toggleText(CharSequence to, CharSequence from) {
-        int grav = getGravity(Destination.TO);
-        int toGravity = isRightGravity(grav) ? -1 : 1;
-        grav = getGravity(Destination.FROM);
-        int fromGravity = isRightGravity(grav) ? -1 : 1;
+    private boolean isLeftGravity(int gravity) {
+        return (gravity & Gravity.LEFT) == Gravity.LEFT;
+    }
 
-        float toPosition = toGravity == -1 ? getWidth() - getPaddingRight() : getPaddingLeft();
-        float fromPosition = fromGravity == -1 ? getWidth() - getPaddingRight() : getPaddingLeft();
+    private void toggleText(CharSequence to, CharSequence from) {
+        final int toGrav = getGravity(Destination.TO);
+        final int fromGrav = getGravity(Destination.FROM);
+        final TransitionDirection direction = getTransitionDirection(toGrav, fromGrav);
+
+        float toPosition = isRightGravity(toGrav) ? getWidth() - getPaddingRight() : getPaddingLeft();
+        float fromPosition = isRightGravity(fromGrav) ? getWidth() - getPaddingRight() : getPaddingLeft();
 
         // If the gravity is changing, we still want to always grab from the left or right of the string.
         // That means, we need to shift our from position
-        if (toGravity != fromGravity) {
+        if (direction == TransitionDirection.GRAVITY && toGrav != fromGrav) {
             float defaultTextSize = getTextSize(Destination.FROM);
             for (int i = 0; i < from.length(); i++) {
                 float size = getTextSize(from, i, defaultTextSize);
-                fromPosition += adjustMeasuredText(size, from.charAt(i), fromGravity);
+                fromPosition += adjustMeasuredText(size, from.charAt(i), direction);
             }
         }
 
         // We always use toGravity here so that we'll start from the same side, regardless of which direction
         // the text is running.
-        int fromIndex = toGravity == -1 ? from.length() - 1 : 0;
-        int startIndex = toGravity == -1 ? to.length() - 1 : 0;
-        int endIndex   = toGravity == -1 ? -1 : to.length();
+        int fromIndex  = isRightGravity(toGravity) ? from.length() - 1 : 0;
+        int startIndex = isRightGravity(toGravity) ?   to.length() - 1 : 0;
+        int endIndex   = isRightGravity(toGravity) ?                -1 : to.length();
 
-        for (int toIndex = startIndex; toIndex != endIndex; toIndex += toGravity) {
-            Transition transition = addTransitionFor(from, to, fromIndex, toIndex, fromPosition, toPosition, toGravity, fromGravity);
+        for (int toIndex = startIndex; toIndex != endIndex; toIndex += direction.value) {
+            Transition transition = addTransitionFor(from, to, fromIndex, toIndex, fromPosition, toPosition);
 
             // Adjust out position based on the textsize of the from and to strings.
-            fromPosition += adjustMeasuredText(transition.fromSize, transition.from, toGravity);
-            toPosition   += adjustMeasuredText(transition.toSize, transition.to, toGravity);
+            fromPosition += adjustMeasuredText(transition.fromSize, transition.from, direction);
+            toPosition   += adjustMeasuredText(transition.toSize, transition.to, direction);
 
             // If this is floating to the right, update its position to account for its size.
-            if (toGravity == -1) { transition.fromPosition = fromPosition; }
-            if (toGravity == -1) { transition.toPosition = toPosition; }
+            if (direction == TransitionDirection.RIGHT) { transition.fromPosition = fromPosition; }
+            if (direction == TransitionDirection.RIGHT) { transition.toPosition = toPosition; }
 
             // Iterate the from string.
-            fromIndex    += toGravity;
+            fromIndex    += direction.value;
         }
 
         while (fromIndex > -1 && fromIndex < from.length()) {
-            Transition transition = addTransitionFor(from, to, fromIndex, -1, fromPosition, toPosition, fromGravity, toGravity);
-            fromPosition += adjustMeasuredText(transition.fromSize, transition.from, toGravity);
-            if (toGravity == -1) { transition.fromPosition = fromPosition; }
-            fromIndex += toGravity;
+            Transition transition = addTransitionFor(from, to, fromIndex, -1, fromPosition, toPosition);
+            fromPosition += adjustMeasuredText(transition.fromSize, transition.from, direction);
+            if (direction == TransitionDirection.RIGHT) { transition.fromPosition = fromPosition; }
+            fromIndex += direction.value;
         }
+    }
+
+    private TransitionDirection getTransitionDirection(int toGrav, int fromGrav) {
+        if (this.direction == TransitionDirection.GRAVITY) {
+            if (isRightGravity(toGrav)) {
+                return TransitionDirection.RIGHT;
+            } else if (isLeftGravity(toGrav)) {
+                return TransitionDirection.LEFT;
+            } else if (isRightGravity(fromGrav)) {
+                return TransitionDirection.LEFT;
+            } else if (isLeftGravity(fromGrav)) {
+                return TransitionDirection.LEFT;
+            }
+            return TransitionDirection.LEFT;
+        }
+        return this.direction;
     }
 
     @Override
@@ -376,7 +444,7 @@ public class AnimatedTextView extends TextView {
         canvas.translate(0, getPaddingTop());
         if (transitions.size() > 0) {
             long now = AnimationUtils.currentAnimationTimeMillis();
-            long showingTime = showAnimation.getStartTime() + showAnimation.getDuration();
+            long showingTime = showAnimation != null ? showAnimation.getStartTime() + showAnimation.getDuration() : now;
             long endingTime = hideAnimation.getStartTime() + hideAnimation.getDuration();
             int i = 0;
 
@@ -391,12 +459,12 @@ public class AnimatedTextView extends TextView {
 
             // If nothing moved, end the transitions
             if (numMoved == 0) {
-                showAnimation.getTransformation(now, showTransformation);
+                if (showAnimation != null) showAnimation.getTransformation(now, showTransformation);
                 hideAnimation.getTransformation(now, hideTransformation);
             }
 
             // Invalidate if the showAnimation is still going
-            if (!showAnimation.hasEnded() || !hideAnimation.hasEnded()) {
+            if (showAnimation != null && !showAnimation.hasEnded() || !hideAnimation.hasEnded()) {
                 postInvalidateOnAnimation();
             } else {
                 transitions.clear();
@@ -424,8 +492,12 @@ public class AnimatedTextView extends TextView {
     private boolean drawTransition(Canvas canvas, Transition transition, long now, long showTime, long hideTime) {
         boolean moved = false;
         float size = paint.measureText("" + transition.to, 0, 1);
-        showAnimation.initialize((int) size, (int) paint.getTextSize(), getWidth(), getHeight());
-        hideAnimation.initialize((int) size, (int) paint.getTextSize(), getWidth(), getHeight());
+        if (showAnimation != null) {
+            showAnimation.initialize((int) size, (int) paint.getTextSize(), getWidth(), getHeight());
+        }
+        if (hideAnimation != null) {
+            hideAnimation.initialize((int) size, (int) paint.getTextSize(), getWidth(), getHeight());
+        }
 
         /*
         if (transition.from == transition.to &&
@@ -444,7 +516,7 @@ public class AnimatedTextView extends TextView {
         */
             float dt = 1;
             float dt2 = 0;
-            if (now < showAnimation.getStartTime()) {
+            if (showAnimation != null && hideAnimation != null && now < showAnimation.getStartTime()) {
                 // Log.i(LOGTAG, "Waiting " + transition.from + " to " + transition.to);
                 // If this letter's showAnimation hasn't started yet, draw it at its startTime
                 if (autoSlide) {
@@ -453,7 +525,7 @@ public class AnimatedTextView extends TextView {
                 }
                 showAnimation.getTransformation(showAnimation.getStartTime(), showTransformation);
                 hideAnimation.getTransformation(hideAnimation.getStartTime(), hideTransformation);
-            } else if (now < showTime) {
+            } else if (showAnimation != null && hideAnimation != null && now < showTime) {
                 // Log.i(LOGTAG, "Moving " + transition.from + " to " + transition.to);
                 // This letter is moving, get its showTransformation set up correctly
                 moved = true;
@@ -466,8 +538,8 @@ public class AnimatedTextView extends TextView {
             } else {
                 // Log.i(LOGTAG, "Done " + transition.from + " to " + transition.to);
                 // This letter is done. Keep it at the end of its showAnimation (so the showAnimation doesn't end).
-                showAnimation.getTransformation(showTime - 1, showTransformation);
-                hideAnimation.getTransformation(hideTime - 1, hideTransformation);
+                if (showAnimation != null) showAnimation.getTransformation(showTime - 1, showTransformation);
+                if (hideAnimation != null) hideAnimation.getTransformation(hideTime - 1, hideTransformation);
                 dt = 1;
                 dt2 = 1;
             }

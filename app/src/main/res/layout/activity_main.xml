@@ -1,4 +1,5 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:whatever="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools" android:layout_width="match_parent"
     android:layout_height="match_parent" android:paddingLeft="@dimen/activity_horizontal_margin"
     android:paddingRight="@dimen/activity_horizontal_margin"
@@ -12,6 +13,11 @@
         android:paddingRight="20dp"
         android:gravity="right"
         android:text="@string/hello_world"
+        whatever:duration="500"
+        whatever:spacing="250"
+        android:minHeight="75dp"
+        android:inAnimation="@anim/fade_in"
+        android:outAnimation="@anim/fade_out"
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />
 

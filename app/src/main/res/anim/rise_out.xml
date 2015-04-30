@@ -3,4 +3,6 @@
     android:interpolator="@android:anim/overshoot_interpolator">
     <translate android:fromYDelta="0"
         android:toYDelta="-75"/>
+    <alpha android:fromAlpha="1"
+        android:toAlpha="0"/>
 </set>
