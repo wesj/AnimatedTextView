@@ -19,8 +19,6 @@ import android.widget.Button;
 import android.widget.SeekBar;
 import android.widget.Spinner;
 
-import org.digdug.widget.AnimatedTextView;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -118,14 +116,40 @@ public class MainActivity extends ActionBarActivity {
                     text.setAnimations(R.anim.fade_in, R.anim.fade_out);
                 } else if (obj.equals("Rotate")) {
                     text.setAnimations(R.anim.rotate_in, R.anim.rotate_out);
-                } else if (obj.equals("Drop in")) {
-                    text.setAnimations(R.anim.drop_in, R.anim.drop_out);
+                } else if (obj.equals("Slide in")) {
+                    text.setAnimations(R.anim.slide_in, R.anim.drop_out);
                 } else if (obj.equals("Rise up")) {
                     text.setAnimations(R.anim.rise_in, R.anim.rise_out);
                 } else if (obj.equals("Squash")) {
                     text.setAnimations(R.anim.squash_in, R.anim.squash_out);
                 } else if (obj.equals("Zoom")) {
                     text.setAnimations(R.anim.zoom_in, R.anim.zoom_out);
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+
+        Spinner directions = (Spinner) findViewById(R.id.directionSelector);
+        adapter = ArrayAdapter.createFromResource(this,
+                R.array.directions, android.R.layout.simple_spinner_item);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        directions.setAdapter(adapter);
+        directions.setSelection(0, true);
+        directions.setOnItemSelectedListener(new OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                CharSequence obj = (CharSequence) parent.getItemAtPosition(position);
+                if (obj.equals("Gravity")) {
+                    text.setDirection(AnimatedTextView.TransitionDirection.GRAVITY);
+                } else if (obj.equals("Left")) {
+                    text.setDirection(AnimatedTextView.TransitionDirection.LEFT);
+                } else if (obj.equals("Right")) {
+                    text.setDirection(AnimatedTextView.TransitionDirection.RIGHT);
+                } else if (obj.equals("Random")) {
+                    text.setDirection(AnimatedTextView.TransitionDirection.RANDOM);
                 }
             }
 
@@ -148,6 +172,8 @@ public class MainActivity extends ActionBarActivity {
                     text.setGravity(Gravity.LEFT);
                 } else if (obj.equals("Right")) {
                     text.setGravity(Gravity.RIGHT);
+                } else if (obj.equals("Center")) {
+                    text.setGravity(Gravity.CENTER_HORIZONTAL);
                 }
             }
 
