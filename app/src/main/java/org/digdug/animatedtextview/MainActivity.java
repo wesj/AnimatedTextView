@@ -116,8 +116,8 @@ public class MainActivity extends ActionBarActivity {
                     text.setAnimations(R.anim.fade_in, R.anim.fade_out);
                 } else if (obj.equals("Rotate")) {
                     text.setAnimations(R.anim.rotate_in, R.anim.rotate_out);
-                } else if (obj.equals("Drop in")) {
-                    text.setAnimations(R.anim.drop_in, R.anim.drop_out);
+                } else if (obj.equals("Slide in")) {
+                    text.setAnimations(R.anim.slide_in, R.anim.drop_out);
                 } else if (obj.equals("Rise up")) {
                     text.setAnimations(R.anim.rise_in, R.anim.rise_out);
                 } else if (obj.equals("Squash")) {

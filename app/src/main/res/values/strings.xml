@@ -7,7 +7,7 @@
     <string-array name="transitions">
         <item>Fade</item>
         <item>Rotate</item>
-        <item>Drop in</item>
+        <item>Slide in</item>
         <item>Rise up</item>
         <item>Squash</item>
         <item>Zoom</item>
